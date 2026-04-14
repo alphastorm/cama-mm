@@ -15,7 +15,8 @@ from discord.ext import commands
 from config import ADMIN_RATING_ADJUSTMENT_MAX_GAMES
 from services.permissions import has_admin_permission
 from utils.formatting import ROLE_EMOJIS, format_betting_display
-from utils.interaction_safety import safe_defer, safe_followup
+from utils.guild import get_interaction_guild_id
+from utils.interaction_safety import fetch_message, safe_defer, safe_followup
 from utils.rate_limiter import GLOBAL_RATE_LIMITER
 
 logger = logging.getLogger("cama_bot.commands.admin")
@@ -62,8 +63,7 @@ class AdminCommands(commands.Cog):
         count: int = 1,
         captain_eligible: bool = False,
     ):
-        guild = interaction.guild if interaction.guild else None
-        rl_gid = guild.id if guild else 0
+        rl_gid = get_interaction_guild_id(interaction) or 0
         rl = GLOBAL_RATE_LIMITER.check(
             scope="addfake",
             guild_id=rl_gid,
@@ -140,7 +140,7 @@ class AdminCommands(commands.Cog):
         role_choices = list(ROLE_EMOJIS.keys())
 
         # guild_id for fake users - use None for global (they're not guild-specific)
-        addfake_guild_id = interaction.guild.id if interaction.guild else None
+        addfake_guild_id = get_interaction_guild_id(interaction)
 
         def _add_fake_users():
             fake_users_added = []
@@ -192,10 +192,9 @@ class AdminCommands(commands.Cog):
         channel_id = self.lobby_service.get_lobby_channel_id()
         if message_id and channel_id and lobby:
             try:
-                channel = self.bot.get_channel(channel_id)
-                if not channel:
-                    channel = await self.bot.fetch_channel(channel_id)
-                message = await channel.fetch_message(message_id)
+                message = await fetch_message(self.bot, channel_id, message_id)
+                if not message:
+                    raise LookupError("Lobby message not found")
                 embed = await asyncio.to_thread(
                     self.lobby_service.build_lobby_embed, lobby, addfake_guild_id
                 )
@@ -254,7 +253,7 @@ class AdminCommands(commands.Cog):
         role_choices = list(ROLE_EMOJIS.keys())
 
         # guild_id for fake users
-        fill_guild_id = interaction.guild.id if interaction.guild else None
+        fill_guild_id = get_interaction_guild_id(interaction)
 
         def _fill_lobby():
             fake_users_added = []
@@ -315,10 +314,9 @@ class AdminCommands(commands.Cog):
         channel_id = self.lobby_service.get_lobby_channel_id()
         if message_id and channel_id and lobby:
             try:
-                channel = self.bot.get_channel(channel_id)
-                if not channel:
-                    channel = await self.bot.fetch_channel(channel_id)
-                message = await channel.fetch_message(message_id)
+                message = await fetch_message(self.bot, channel_id, message_id)
+                if not message:
+                    raise LookupError("Lobby message not found")
                 embed = await asyncio.to_thread(
                     self.lobby_service.build_lobby_embed, lobby, fill_guild_id
                 )
@@ -340,8 +338,7 @@ class AdminCommands(commands.Cog):
     )
     @app_commands.describe(user="The user whose account to reset")
     async def resetuser(self, interaction: discord.Interaction, user: discord.Member):
-        guild = interaction.guild if interaction.guild else None
-        rl_gid = guild.id if guild else 0
+        rl_gid = get_interaction_guild_id(interaction) or 0
         rl = GLOBAL_RATE_LIMITER.check(
             scope="resetuser",
             guild_id=rl_gid,
@@ -366,7 +363,7 @@ class AdminCommands(commands.Cog):
             )
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         player = await asyncio.to_thread(self.player_service.get_player, user.id, guild_id)
         if not player:
             await safe_followup(
@@ -411,8 +408,7 @@ class AdminCommands(commands.Cog):
         steam_id: int,
         mmr: int = None,
     ):
-        guild = interaction.guild if interaction.guild else None
-        rl_gid = guild.id if guild else 0
+        rl_gid = get_interaction_guild_id(interaction) or 0
         rl = GLOBAL_RATE_LIMITER.check(
             scope="registeruser",
             guild_id=rl_gid,
@@ -456,7 +452,7 @@ class AdminCommands(commands.Cog):
             )
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         try:
             result = await asyncio.to_thread(
@@ -496,8 +492,7 @@ class AdminCommands(commands.Cog):
 
     @admin.command(name="sync", description="Force sync commands (Admin only)")
     async def sync(self, interaction: discord.Interaction):
-        guild = interaction.guild if interaction.guild else None
-        rl_gid = guild.id if guild else 0
+        rl_gid = get_interaction_guild_id(interaction) or 0
         rl = GLOBAL_RATE_LIMITER.check(
             scope="sync",
             guild_id=rl_gid,
@@ -576,7 +571,7 @@ class AdminCommands(commands.Cog):
             )
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         # Handle nonprofit fund target
         if nonprofit:
@@ -678,7 +673,7 @@ class AdminCommands(commands.Cog):
             )
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         player = await asyncio.to_thread(self.player_service.get_player, user.id, guild_id)
         if not player:
             await interaction.response.send_message(
@@ -722,7 +717,7 @@ class AdminCommands(commands.Cog):
             )
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         player = await asyncio.to_thread(self.player_service.get_player, user.id, guild_id)
         if not player:
             await interaction.response.send_message(
@@ -775,7 +770,7 @@ class AdminCommands(commands.Cog):
             )
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         player = await asyncio.to_thread(self.player_service.get_player, user.id, guild_id)
         if not player:
             await interaction.response.send_message(
@@ -842,7 +837,7 @@ class AdminCommands(commands.Cog):
             )
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         result = await asyncio.to_thread(
             self.recalibration_service.can_recalibrate, user.id, guild_id
         )
@@ -935,7 +930,7 @@ class AdminCommands(commands.Cog):
             return
 
         await safe_defer(interaction, ephemeral=True)
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         result = await asyncio.to_thread(self.player_service.bump_glicko_rds, guild_id, amount)
         if result is None:
@@ -977,7 +972,7 @@ class AdminCommands(commands.Cog):
             )
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         player = await asyncio.to_thread(self.player_service.get_player, user.id, guild_id)
         if not player:
             await interaction.response.send_message(
@@ -1042,7 +1037,7 @@ class AdminCommands(commands.Cog):
             )
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         # Check for pending match
         pending_state = await asyncio.to_thread(match_service.get_last_shuffle, guild_id)
@@ -1087,52 +1082,50 @@ class AdminCommands(commands.Cog):
 
         if message_id and channel_id:
             try:
-                channel = self.bot.get_channel(channel_id)
-                if channel:
-                    message = await channel.fetch_message(message_id)
-                    if message and message.embeds:
-                        embed = message.embeds[0].copy()
+                message = await fetch_message(self.bot, channel_id, message_id)
+                if message and message.embeds:
+                    embed = message.embeds[0].copy()
 
-                        # Find and update the betting field
-                        betting_service = getattr(self.bot, "betting_service", None)
-                        totals = {"radiant": 0, "dire": 0}
-                        betting_mode = pending_state.get("betting_mode", "pool")
+                    # Find and update the betting field
+                    betting_service = getattr(self.bot, "betting_service", None)
+                    totals = {"radiant": 0, "dire": 0}
+                    betting_mode = pending_state.get("betting_mode", "pool")
 
-                        if betting_service:
-                            totals = await asyncio.to_thread(
-                                functools.partial(
-                                    betting_service.get_pot_odds,
-                                    guild_id,
-                                    pending_state=pending_state,
-                                )
+                    if betting_service:
+                        totals = await asyncio.to_thread(
+                            functools.partial(
+                                betting_service.get_pot_odds,
+                                guild_id,
+                                pending_state=pending_state,
                             )
-
-                        new_field_name, new_field_value = format_betting_display(
-                            totals["radiant"], totals["dire"], betting_mode, new_lock_until
                         )
 
-                        # Find and replace the betting field (usually the last field or has "Wagers" in name)
-                        new_fields = []
-                        for field in embed.fields:
-                            if (
-                                "Wagers" in field.name
-                                or "Current Wagers" in field.name
-                                or "Pool" in field.name
-                            ):
-                                new_fields.append(
-                                    discord.EmbedField(
-                                        name=new_field_name, value=new_field_value, inline=False
-                                    )
+                    new_field_name, new_field_value = format_betting_display(
+                        totals["radiant"], totals["dire"], betting_mode, new_lock_until
+                    )
+
+                    # Find and replace the betting field (usually the last field or has "Wagers" in name)
+                    new_fields = []
+                    for field in embed.fields:
+                        if (
+                            "Wagers" in field.name
+                            or "Current Wagers" in field.name
+                            or "Pool" in field.name
+                        ):
+                            new_fields.append(
+                                discord.EmbedField(
+                                    name=new_field_name, value=new_field_value, inline=False
                                 )
-                            else:
-                                new_fields.append(field)
+                            )
+                        else:
+                            new_fields.append(field)
 
-                        embed.clear_fields()
-                        for field in new_fields:
-                            embed.add_field(name=field.name, value=field.value, inline=field.inline)
+                    embed.clear_fields()
+                    for field in new_fields:
+                        embed.add_field(name=field.name, value=field.value, inline=field.inline)
 
-                        await message.edit(embed=embed)
-                        embed_updated = True
+                    await message.edit(embed=embed)
+                    embed_updated = True
             except Exception as exc:
                 logger.warning(f"Failed to update shuffle embed after extending betting: {exc}")
 
@@ -1199,7 +1192,7 @@ class AdminCommands(commands.Cog):
             )
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         try:
             result = await asyncio.to_thread(
@@ -1295,7 +1288,7 @@ class AdminCommands(commands.Cog):
             )
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         player = await asyncio.to_thread(self.player_service.get_player, user.id, guild_id)
         if not player:
             await interaction.response.send_message(
@@ -1361,7 +1354,7 @@ class AdminCommands(commands.Cog):
             )
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         player = await asyncio.to_thread(self.player_service.get_player, user.id, guild_id)
         if not player:
             await interaction.response.send_message(
@@ -1425,7 +1418,7 @@ class AdminCommands(commands.Cog):
             )
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         player = await asyncio.to_thread(self.player_service.get_player, user.id, guild_id)
         if not player:
             await interaction.response.send_message(
@@ -1490,7 +1483,7 @@ class AdminCommands(commands.Cog):
             pool_size = random.randint(4, 6)
             player_hero_pools[i] = random.sample(HERO_POOL, k=pool_size)
 
-        seed_guild_id = interaction.guild.id if interaction.guild else None
+        seed_guild_id = get_interaction_guild_id(interaction)
 
         def _seed_data():
             # 1. Create fake players

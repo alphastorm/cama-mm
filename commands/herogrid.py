@@ -12,6 +12,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils.drawing import draw_hero_grid
+from utils.guild import get_interaction_guild_id
 from utils.interaction_safety import safe_defer, safe_followup
 
 logger = logging.getLogger("cama_bot.commands.herogrid")
@@ -110,7 +111,7 @@ class HeroGridCommands(commands.Cog):
             return
 
         source_value = source.value if source else "auto"
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         # Determine player list via priority chain
         player_ids, source_label = self._resolve_player_ids(source_value, guild_id)

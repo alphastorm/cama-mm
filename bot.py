@@ -59,8 +59,9 @@ from config import (
     USE_GLICKO,
 )
 from infrastructure.service_container import ServiceContainer
-from services.permissions import has_admin_permission  # noqa: F401 - used by tests
+from services.permissions import AdminOnlyError, has_admin_permission  # noqa: F401 - used by tests
 from utils.formatting import FROGLING_EMOJI_ID, FROGLING_EMOTE, JOPACOIN_EMOJI_ID, JOPACOIN_EMOTE
+from utils.interaction_safety import fetch_message
 
 # Bot setup
 
@@ -428,6 +429,8 @@ async def on_app_command_error(interaction: discord.Interaction, error: discord.
             f"Could not find user `{value}`. "
             "Please use @mention or select from Discord's user picker when typing."
         )
+    elif isinstance(error, AdminOnlyError):
+        error_msg = str(error) or "This command is admin-only."
     else:
         # Generic error message
         error_msg = "An error occurred while processing your command. Please try again."
@@ -479,11 +482,9 @@ async def on_raw_reaction_add(payload):
                     cog = bot.get_cog("LobbyCommands")
                     embed = cog.rebuild_readycheck_embed() if cog else None
                     if embed:
-                        channel = bot.get_channel(payload.channel_id)
-                        if not channel:
-                            channel = await bot.fetch_channel(payload.channel_id)
-                        message = await channel.fetch_message(payload.message_id)
-                        await message.edit(embed=embed)
+                        message = await fetch_message(bot, payload.channel_id, payload.message_id)
+                        if message:
+                            await message.edit(embed=embed)
             except Exception as exc:
                 logger.error(f"Error handling readycheck reaction: {exc}", exc_info=True)
         return
@@ -507,12 +508,10 @@ async def on_raw_reaction_add(payload):
         if status != "ok":
             # Visible feedback that nothing happened — remove only this user's reaction
             try:
-                channel = bot.get_channel(payload.channel_id)
-                if not channel:
-                    channel = await bot.fetch_channel(payload.channel_id)
-                message = await channel.fetch_message(payload.message_id)
-                user = await bot.fetch_user(payload.user_id)
-                await message.remove_reaction("🔔", user)
+                message = await fetch_message(bot, payload.channel_id, payload.message_id)
+                if message:
+                    user = await bot.fetch_user(payload.user_id)
+                    await message.remove_reaction("🔔", user)
             except Exception:
                 pass
         return
@@ -526,11 +525,10 @@ async def on_raw_reaction_add(payload):
 
     _init_services()  # Ensure services are initialized
     try:
-        channel = bot.get_channel(payload.channel_id)
-        if not channel:
-            channel = await bot.fetch_channel(payload.channel_id)
-
-        message = await channel.fetch_message(payload.message_id)
+        message = await fetch_message(bot, payload.channel_id, payload.message_id)
+        if not message:
+            return
+        channel = message.channel
         if message.id != bot.lobby_service.get_lobby_message_id():
             return
 
@@ -707,11 +705,9 @@ async def on_raw_reaction_remove(payload):
                     cog = bot.get_cog("LobbyCommands")
                     embed = cog.rebuild_readycheck_embed() if cog else None
                     if embed:
-                        channel = bot.get_channel(payload.channel_id)
-                        if not channel:
-                            channel = await bot.fetch_channel(payload.channel_id)
-                        message = await channel.fetch_message(payload.message_id)
-                        await message.edit(embed=embed)
+                        message = await fetch_message(bot, payload.channel_id, payload.message_id)
+                        if message:
+                            await message.edit(embed=embed)
             except Exception as exc:
                 logger.error(f"Error handling readycheck reaction remove: {exc}", exc_info=True)
         return
@@ -724,10 +720,9 @@ async def on_raw_reaction_remove(payload):
 
     _init_services()  # Ensure services are initialized
     try:
-        channel = bot.get_channel(payload.channel_id)
-        if not channel:
-            channel = await bot.fetch_channel(payload.channel_id)
-        message = await channel.fetch_message(payload.message_id)
+        message = await fetch_message(bot, payload.channel_id, payload.message_id)
+        if not message:
+            return
         if message.id != bot.lobby_service.get_lobby_message_id():
             return
 

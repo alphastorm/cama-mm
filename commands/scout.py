@@ -17,6 +17,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils.drawing import draw_scout_report
+from utils.guild import get_interaction_guild_id
 from utils.interaction_safety import safe_defer, safe_followup
 
 logger = logging.getLogger("cama_bot.commands.scout")
@@ -245,7 +246,7 @@ class ScoutCommands(commands.Cog):
         if not await safe_defer(interaction):
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         team_value = team.value if team else None
 
         # Determine player IDs

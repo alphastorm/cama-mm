@@ -3,8 +3,15 @@ Permission checking utilities for the bot.
 """
 
 import discord
+from discord import app_commands
 
 from config import ADMIN_USER_IDS
+
+DEFAULT_ADMIN_ONLY_MESSAGE = "This command is admin-only."
+
+
+class AdminOnlyError(app_commands.CheckFailure):
+    """Raised when a non-admin invokes an admin-only command."""
 
 
 def has_allowlisted_admin(interaction: discord.Interaction) -> bool:
@@ -49,3 +56,21 @@ def has_admin_permission(interaction: discord.Interaction) -> bool:
         return bool(getattr(perms, "administrator", False) or getattr(perms, "manage_guild", False))
 
     return False
+
+
+def admin_only(
+    message: str = DEFAULT_ADMIN_ONLY_MESSAGE,
+) -> app_commands.Check:
+    """
+    Return an app-command check that restricts a command to admins.
+
+    The check raises ``AdminOnlyError`` with ``message`` when the caller does
+    not have admin permission.
+    """
+
+    async def predicate(interaction: discord.Interaction) -> bool:
+        if has_admin_permission(interaction):
+            return True
+        raise AdminOnlyError(message)
+
+    return app_commands.check(predicate)

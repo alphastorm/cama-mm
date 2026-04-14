@@ -17,6 +17,7 @@ from discord.ext import commands
 
 from commands.checks import require_gamba_channel
 from services.mana_service import LAND_COLORS, LAND_EMOJIS, LAND_ORDER, get_today_pst
+from utils.guild import get_interaction_guild_id
 from utils.interaction_safety import safe_defer, safe_followup
 
 if TYPE_CHECKING:
@@ -90,7 +91,7 @@ class ManaCommands(commands.Cog):
 
         await safe_defer(interaction, ephemeral=False)
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         mana_service: ManaService = interaction.client.mana_service
 
         # --- Guild board: roll everyone then paginate ---

@@ -10,6 +10,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from services.pairings_service import PairingsService
+from utils.guild import get_interaction_guild_id
 from utils.interaction_safety import safe_defer, safe_followup
 
 logger = logging.getLogger("cama_bot.commands.advstats")
@@ -63,7 +64,7 @@ class AdvancedStatsCommands(commands.Cog):
             return
 
         # Verify both players are registered
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         p1 = await asyncio.to_thread(self.player_service.get_player, player1.id, guild_id)
         p2 = await asyncio.to_thread(self.player_service.get_player, player2.id, guild_id)
 

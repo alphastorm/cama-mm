@@ -146,6 +146,26 @@ async def safe_followup(
         return msg
 
 
+async def fetch_message(
+    bot,
+    channel_id: int | None,
+    message_id: int | None,
+) -> discord.Message | None:
+    """
+    Fetch a Discord message by channel and message ID using cache-first lookup.
+
+    Returns ``None`` when either ID is missing. Discord fetch errors are
+    allowed to propagate to the caller.
+    """
+    if not channel_id or not message_id:
+        return None
+
+    channel = bot.get_channel(channel_id)
+    if not channel:
+        channel = await bot.fetch_channel(channel_id)
+    return await channel.fetch_message(message_id)
+
+
 async def update_lobby_message_closed(
     bot, lobby_service, reason: str = "Lobby Closed"
 ) -> None:
@@ -159,10 +179,9 @@ async def update_lobby_message_closed(
         return
 
     try:
-        channel = bot.get_channel(channel_id)
-        if not channel:
-            channel = await bot.fetch_channel(channel_id)
-        message = await channel.fetch_message(message_id)
+        message = await fetch_message(bot, channel_id, message_id)
+        if not message:
+            return
 
         import discord
         embed = discord.Embed(

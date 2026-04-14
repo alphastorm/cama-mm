@@ -29,6 +29,7 @@ from utils.drawing import (
     draw_role_graph,
 )
 from utils.formatting import JOPACOIN_EMOTE, TOMBSTONE_EMOJI, format_role_display
+from utils.guild import get_interaction_guild_id
 from utils.interaction_safety import safe_defer, safe_followup
 from utils.rate_limiter import GLOBAL_RATE_LIMITER
 from utils.rating_insights import get_rd_tier_name, rd_to_certainty
@@ -1830,8 +1831,8 @@ class ProfileCommands(commands.Cog):
     ):
         """Display unified player profile with tabbed navigation."""
         # Rate limiting
-        guild = interaction.guild if interaction.guild else None
-        rl_gid = guild.id if guild else 0
+        guild_id = get_interaction_guild_id(interaction)
+        rl_gid = guild_id or 0
         rl = GLOBAL_RATE_LIMITER.check(
             scope="profile",
             guild_id=rl_gid,
@@ -1851,7 +1852,6 @@ class ProfileCommands(commands.Cog):
 
         target_user = user or interaction.user
         target_discord_id = target_user.id
-        guild_id = guild.id if guild else None
 
         # Check if player is registered
         player_repo = self._get_player_repo()

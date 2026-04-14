@@ -53,6 +53,7 @@ from services.permissions import has_admin_permission
 from services.player_service import PlayerService
 from services.tip_service import TipService
 from utils.formatting import JOPACOIN_EMOTE, format_betting_display
+from utils.guild import get_interaction_guild_id
 from utils.interaction_safety import safe_defer
 from utils.neon_helpers import get_neon_service, send_neon_result
 from utils.rate_limiter import GLOBAL_RATE_LIMITER
@@ -482,7 +483,7 @@ class BettingCommands(commands.Cog):
         self, interaction: discord.Interaction, current: str
     ) -> list[app_commands.Choice[int]]:
         """Autocomplete for pending match IDs."""
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         try:
             pending = await asyncio.to_thread(
                 self.match_service.state_service.get_all_pending_matches, guild_id
@@ -1210,8 +1211,8 @@ class BettingCommands(commands.Cog):
         leverage: app_commands.Choice[int] = None,
         match: int = None,
     ):
-        guild = interaction.guild if interaction.guild else None
-        rl_gid = guild.id if guild else 0
+        guild_id = get_interaction_guild_id(interaction)
+        rl_gid = guild_id or 0
         rl = GLOBAL_RATE_LIMITER.check(
             scope="bet",
             guild_id=rl_gid,
@@ -1228,7 +1229,6 @@ class BettingCommands(commands.Cog):
 
         if not await safe_defer(interaction, ephemeral=True):
             return
-        guild_id = interaction.guild.id if interaction.guild else None
         user_id = interaction.user.id
 
         if amount < JOPACOIN_MIN_BET:
@@ -1409,8 +1409,8 @@ class BettingCommands(commands.Cog):
 
     @app_commands.command(name="mybets", description="Show your active bets")
     async def mybets(self, interaction: discord.Interaction):
-        guild = interaction.guild if interaction.guild else None
-        rl_gid = guild.id if guild else 0
+        guild_id = get_interaction_guild_id(interaction)
+        rl_gid = guild_id or 0
         rl = GLOBAL_RATE_LIMITER.check(
             scope="mybets",
             guild_id=rl_gid,
@@ -1427,8 +1427,6 @@ class BettingCommands(commands.Cog):
 
         if not await safe_defer(interaction, ephemeral=True):
             return
-
-        guild_id = interaction.guild.id if interaction.guild else None
 
         # Get all pending bets for the user (across all matches)
         all_bets = await asyncio.to_thread(
@@ -1542,8 +1540,7 @@ class BettingCommands(commands.Cog):
     async def bets(self, interaction: discord.Interaction, match: int = None):
         """View all bets in the current pool."""
         if not has_admin_permission(interaction):
-            guild = interaction.guild if interaction.guild else None
-            rl_gid = guild.id if guild else 0
+            rl_gid = get_interaction_guild_id(interaction) or 0
             rl = GLOBAL_RATE_LIMITER.check(
                 scope="bets",
                 guild_id=rl_gid,
@@ -1561,7 +1558,7 @@ class BettingCommands(commands.Cog):
         if not await safe_defer(interaction, ephemeral=True):
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         user_id = interaction.user.id
 
         # Handle match selection for concurrent match support
@@ -1721,8 +1718,8 @@ class BettingCommands(commands.Cog):
 
     @app_commands.command(name="balance", description="Check your jopacoin balance")
     async def balance(self, interaction: discord.Interaction):
-        guild = interaction.guild if interaction.guild else None
-        rl_gid = guild.id if guild else 0
+        guild_id = get_interaction_guild_id(interaction)
+        rl_gid = guild_id or 0
         rl = GLOBAL_RATE_LIMITER.check(
             scope="balance",
             guild_id=rl_gid,
@@ -1741,7 +1738,6 @@ class BettingCommands(commands.Cog):
             return
 
         user_id = interaction.user.id
-        guild_id = guild.id if guild else None
         balance = await asyncio.to_thread(self.player_service.get_balance, user_id, guild_id)
 
         # Check for bankruptcy penalty
@@ -1803,7 +1799,7 @@ class BettingCommands(commands.Cog):
             return
 
         user_id = interaction.user.id
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         now = time.time()
 
         # Check if player is registered
@@ -2408,7 +2404,7 @@ class BettingCommands(commands.Cog):
                 await asyncio.to_thread(
                     lambda: db.execute_write(
                         "INSERT INTO mana_shop_items (discord_id, guild_id, item_type, purchased_at, data) VALUES (?, ?, ?, ?, ?)",
-                        (user_id, interaction.guild.id if interaction.guild else 0, "frozen_assets", int(_time_fa.time()), "pending"),
+                        (user_id, guild_id or 0, "frozen_assets", int(_time_fa.time()), "pending"),
                     )
                 )
             # No balance change
@@ -2454,7 +2450,7 @@ class BettingCommands(commands.Cog):
                 await asyncio.to_thread(
                     lambda: db.execute_write(
                         "INSERT INTO mana_shop_items (discord_id, guild_id, item_type, purchased_at, expires_at, data) VALUES (?, ?, ?, ?, ?, ?)",
-                        (user_id, interaction.guild.id if interaction.guild else 0, "sanctuary", now_ts, expires, "active"),
+                        (user_id, guild_id or 0, "sanctuary", now_ts, expires, "active"),
                     )
                 )
             # No balance change
@@ -2974,7 +2970,7 @@ class BettingCommands(commands.Cog):
             return
 
         user_id = interaction.user.id
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         # Check if player is registered
         player = await asyncio.to_thread(self.player_service.get_player, user_id, guild_id)
@@ -3090,7 +3086,7 @@ class BettingCommands(commands.Cog):
             return
 
         user_id = interaction.user.id
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         # Check if player is registered
         player = await asyncio.to_thread(self.player_service.get_player, user_id, guild_id)
@@ -3213,8 +3209,8 @@ class BettingCommands(commands.Cog):
         player: discord.Member,
         amount: int,
     ):
-        guild = interaction.guild if interaction.guild else None
-        rl_gid = guild.id if guild else 0
+        guild_id = get_interaction_guild_id(interaction)
+        rl_gid = guild_id or 0
         rl = GLOBAL_RATE_LIMITER.check(
             scope="tip",
             guild_id=rl_gid,
@@ -3248,9 +3244,6 @@ class BettingCommands(commands.Cog):
                 ephemeral=True,
             )
             return
-
-        # Extract guild_id early for consistent audit trail
-        guild_id = interaction.guild.id if interaction.guild else None
 
         # Check if both players are registered
         sender = await asyncio.to_thread(self.player_service.get_player, interaction.user.id, guild_id)
@@ -3425,8 +3418,8 @@ class BettingCommands(commands.Cog):
         player: discord.Member,
         amount: int,
     ):
-        guild = interaction.guild if interaction.guild else None
-        rl_gid = guild.id if guild else 0
+        guild_id = get_interaction_guild_id(interaction)
+        rl_gid = guild_id or 0
         rl = GLOBAL_RATE_LIMITER.check(
             scope="paydebt",
             guild_id=rl_gid,
@@ -3444,8 +3437,6 @@ class BettingCommands(commands.Cog):
         # Always public since helping another player
         if not await safe_defer(interaction, ephemeral=False):
             return
-
-        guild_id = guild.id if guild else None
         try:
             result = await asyncio.to_thread(
                 functools.partial(
@@ -3470,8 +3461,8 @@ class BettingCommands(commands.Cog):
         description="Declare bankruptcy to clear your debt (once per week, with penalties)",
     )
     async def bankruptcy(self, interaction: discord.Interaction):
-        guild = interaction.guild if interaction.guild else None
-        rl_gid = guild.id if guild else 0
+        guild_id = get_interaction_guild_id(interaction)
+        rl_gid = guild_id or 0
         rl = GLOBAL_RATE_LIMITER.check(
             scope="bankruptcy",
             guild_id=rl_gid,
@@ -3495,7 +3486,6 @@ class BettingCommands(commands.Cog):
             return
 
         user_id = interaction.user.id
-        guild_id = guild.id if guild else None
 
         # Check if player is registered
         player = await asyncio.to_thread(self.player_service.get_player, user_id, guild_id)
@@ -3659,7 +3649,7 @@ class BettingCommands(commands.Cog):
             return
 
         user_id = interaction.user.id
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         # Check if registered
         if not await asyncio.to_thread(self.player_service.get_player, user_id, guild_id):
@@ -3883,7 +3873,7 @@ class BettingCommands(commands.Cog):
             )
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         total = await asyncio.to_thread(self.loan_service.get_nonprofit_fund, guild_id)
 
         # Check for active proposal with reserved funds
@@ -4007,7 +3997,7 @@ class BettingCommands(commands.Cog):
             )
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         action_value = action.value if action else "status"
 
         if action_value == "propose":
@@ -4420,7 +4410,7 @@ class BettingCommands(commands.Cog):
             return
 
         user_id = interaction.user.id
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         rebellion_service = self.rebellion_service or getattr(self.bot, "rebellion_service", None)
         if not rebellion_service:
@@ -4792,7 +4782,7 @@ class DisburseVoteView(discord.ui.View):
         self, interaction: discord.Interaction, method: str, label: str
     ):
         """Handle a vote button press."""
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         # Check if user is registered
         player = await asyncio.to_thread(self.cog.player_service.get_player, interaction.user.id, guild_id)

@@ -16,6 +16,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils.formatting import JOPACOIN_EMOTE
+from utils.guild import get_interaction_guild_id
 from utils.interaction_safety import safe_defer, safe_followup
 
 DOGGEH_MESSAGES = [
@@ -83,7 +84,7 @@ class RollCommands(commands.Cog):
     @app_commands.describe(value="A positive integer to roll up to, or 'doggeh' for mystical prophecy")
     async def roll(self, interaction: discord.Interaction, value: str):
         user_id = interaction.user.id
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         # Registration check
         player = await asyncio.to_thread(self.player_service.get_player, user_id, guild_id)

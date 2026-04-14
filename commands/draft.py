@@ -17,11 +17,12 @@ from config import BET_LOCK_SECONDS, BOMB_POT_CHANCE, JOPACOIN_MIN_BET, LOBBY_RE
 from domain.models.draft import SNAKE_DRAFT_ORDER, DraftPhase, DraftState
 from domain.services.draft_service import DraftService
 from services.draft_state_manager import DraftStateManager
-from services.permissions import has_admin_permission
+from services.permissions import admin_only, has_admin_permission
 from shuffler import BalancedShuffler
 from utils.draft_embeds import format_player_row, format_roles
 from utils.formatting import JOPACOIN_EMOTE, format_betting_display, get_player_display_name
-from utils.interaction_safety import safe_defer
+from utils.guild import get_interaction_guild_id
+from utils.interaction_safety import fetch_message, safe_defer
 from utils.neon_helpers import get_neon_service, send_neon_result
 
 if TYPE_CHECKING:
@@ -386,7 +387,7 @@ class DraftCommands(commands.Cog):
             f"setting eligible={eligible.value}"
         )
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         # Check if user is registered
         player = await asyncio.to_thread(self.player_repo.get_by_id, interaction.user.id, guild_id)
@@ -425,7 +426,7 @@ class DraftCommands(commands.Cog):
         interaction: discord.Interaction,
     ):
         """Restart an active draft. Only captains or admins can restart."""
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         user_id = interaction.user.id
 
         logger.info(
@@ -481,14 +482,11 @@ class DraftCommands(commands.Cog):
         name="sampleinprogress",
         description="[Admin] Show sample draft UI mid-draft for testing",
     )
+    @admin_only("Admin only command.")
     async def sampledraftinprogress(self, interaction: discord.Interaction):
         """Show a sample draft in progress for UI testing."""
-        if not has_admin_permission(interaction):
-            await interaction.response.send_message("❌ Admin only command.", ephemeral=True)
-            return
-
         # Create a mock draft state
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         state = DraftState(guild_id=guild_id)
 
         # Use fake player IDs (negative) for the sample
@@ -545,14 +543,11 @@ class DraftCommands(commands.Cog):
         name="samplecomplete",
         description="[Admin] Show sample draft complete UI for testing",
     )
+    @admin_only("Admin only command.")
     async def sampledraftcomplete(self, interaction: discord.Interaction):
         """Show a sample completed draft for UI testing."""
-        if not has_admin_permission(interaction):
-            await interaction.response.send_message("❌ Admin only command.", ephemeral=True)
-            return
-
         # Create a mock completed draft state
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         state = DraftState(guild_id=guild_id)
 
         state.captain1_id = -101
@@ -1002,7 +997,7 @@ class DraftCommands(commands.Cog):
         captain2: discord.Member | None = None,
     ):
         """Start an Immortal Draft session."""
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         logger.info(
             f"Startdraft command: User {interaction.user.id} ({interaction.user}) "
             f"in guild {guild_id}, captain1={captain1}, captain2={captain2}"
@@ -1685,11 +1680,7 @@ class DraftCommands(commands.Cog):
     ):
         """Update the draft message with current state."""
         try:
-            channel = self.bot.get_channel(channel_id)
-            if not channel:
-                return
-
-            message = await channel.fetch_message(message_id)
+            message = await fetch_message(self.bot, channel_id, message_id)
             if not message:
                 return
 
@@ -2296,11 +2287,13 @@ class DraftCommands(commands.Cog):
         # Try to update the message to show timeout
         if state.draft_message_id and state.draft_channel_id:
             try:
-                channel = self.bot.get_channel(state.draft_channel_id)
-                if not channel:
-                    channel = await self.bot.fetch_channel(state.draft_channel_id)
-
-                message = await channel.fetch_message(state.draft_message_id)
+                message = await fetch_message(
+                    self.bot,
+                    state.draft_channel_id,
+                    state.draft_message_id,
+                )
+                if not message:
+                    return
 
                 embed = discord.Embed(
                     title="⏰ Draft Timed Out",

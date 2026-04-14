@@ -34,7 +34,7 @@ from utils.formatting import (
     format_betting_display,
     get_player_display_name,
 )
-from utils.guild import normalize_guild_id
+from utils.guild import get_interaction_guild_id, normalize_guild_id
 from utils.interaction_safety import safe_defer, update_lobby_message_closed
 from utils.match_views import EnrichedMatchView
 from utils.neon_helpers import _delete_after as _neon_delete_after
@@ -306,7 +306,8 @@ class MatchCommands(commands.Cog):
     ):
         logger.info(f"Shuffle command: User {interaction.user.id} ({interaction.user})")
         guild = interaction.guild if hasattr(interaction, "guild") else None
-        rl_gid = guild.id if guild else 0
+        guild_id = get_interaction_guild_id(interaction)
+        rl_gid = guild_id or 0
         rl = GLOBAL_RATE_LIMITER.check(
             scope="shuffle",
             guild_id=rl_gid,
@@ -323,8 +324,6 @@ class MatchCommands(commands.Cog):
 
         if not await safe_defer(interaction, ephemeral=False):
             return
-
-        guild_id = guild.id if guild else None
 
         # Acquire shuffle lock to prevent race conditions
         lobby_manager = self.lobby_service.lobby_manager
@@ -915,7 +914,8 @@ class MatchCommands(commands.Cog):
         dotabuff_match_id: str = None,
     ):
         guild = interaction.guild if hasattr(interaction, "guild") else None
-        rl_gid = guild.id if guild else 0
+        guild_id = get_interaction_guild_id(interaction)
+        rl_gid = guild_id or 0
         rl = GLOBAL_RATE_LIMITER.check(
             scope="record",
             guild_id=rl_gid,
@@ -936,10 +936,6 @@ class MatchCommands(commands.Cog):
         logger.info(
             f"Record command: User {interaction.user.id} ({interaction.user.name}) "
             f"result={result.value} match_id={dotabuff_match_id}"
-        )
-
-        guild_id = (
-            interaction.guild.id if hasattr(interaction, "guild") and interaction.guild else None
         )
 
         # Auto-detect which pending match the voter is in (for concurrent match support)

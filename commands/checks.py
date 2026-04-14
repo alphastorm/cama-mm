@@ -6,6 +6,8 @@ import asyncio
 
 import discord
 
+from utils.guild import get_interaction_guild_id
+
 
 async def require_gamba_channel(interaction: discord.Interaction) -> bool:
     """Return True if the channel name contains 'gamba'.
@@ -20,7 +22,7 @@ async def require_gamba_channel(interaction: discord.Interaction) -> bool:
 
     # Charge 1 JC
     user_id = interaction.user.id
-    guild_id = interaction.guild.id if interaction.guild else None
+    guild_id = get_interaction_guild_id(interaction)
     player_service = interaction.client.player_service  # type: ignore[union-attr]
     await asyncio.to_thread(player_service.adjust_balance, user_id, guild_id, -1)
 

@@ -14,6 +14,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from utils.guild import get_interaction_guild_id
 from utils.interaction_safety import safe_defer, safe_followup
 from utils.rate_limiter import RateLimiter
 
@@ -61,7 +62,7 @@ class AskCommands(commands.Cog):
         - "Who plays pos 1 the most?"
         - "What's the best team duo?"
         """
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         # Rate limit check
         rl_result = AI_RATE_LIMITER.check(

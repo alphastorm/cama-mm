@@ -5,6 +5,13 @@ This module centralizes guild ID handling to ensure consistent behavior
 across the codebase.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import discord
+
 
 def normalize_guild_id(guild_id: int | None) -> int:
     """
@@ -28,6 +35,16 @@ def normalize_guild_id(guild_id: int | None) -> int:
         0
     """
     return guild_id if guild_id is not None else 0
+
+
+def get_interaction_guild_id(interaction: discord.Interaction | Any) -> int | None:
+    """
+    Extract ``guild_id`` from an interaction.
+
+    Returns ``None`` for DMs or for test doubles that do not provide a guild.
+    """
+    guild = getattr(interaction, "guild", None)
+    return guild.id if guild else None
 
 
 def is_dm_context(guild_id: int | None) -> bool:

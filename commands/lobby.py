@@ -22,7 +22,13 @@ from utils.formatting import (
     JOPACOIN_EMOJI_ID,
     format_duration_short,
 )
-from utils.interaction_safety import safe_defer, safe_followup, update_lobby_message_closed
+from utils.guild import get_interaction_guild_id
+from utils.interaction_safety import (
+    fetch_message,
+    safe_defer,
+    safe_followup,
+    update_lobby_message_closed,
+)
 from utils.neon_helpers import get_neon_service
 from utils.pin_helpers import safe_unpin_all_bot_messages
 from utils.rate_limiter import GLOBAL_RATE_LIMITER
@@ -112,10 +118,9 @@ class LobbyCommands(commands.Cog):
             return
 
         try:
-            channel = self.bot.get_channel(channel_id)
-            if not channel:
-                channel = await self.bot.fetch_channel(channel_id)
-            message = await channel.fetch_message(message_id)
+            message = await fetch_message(self.bot, channel_id, message_id)
+            if not message:
+                return
             # Remove sword reaction
             try:
                 await message.remove_reaction("⚔️", user)
@@ -139,7 +144,7 @@ class LobbyCommands(commands.Cog):
         try:
             channel = interaction.channel
             message = await channel.fetch_message(message_id)
-            guild_id = interaction.guild.id if interaction.guild else None
+            guild_id = get_interaction_guild_id(interaction)
             embed = await asyncio.to_thread(self.lobby_service.build_lobby_embed, lobby, guild_id)
             if embed:
                 await message.edit(embed=embed, allowed_mentions=discord.AllowedMentions.none())
@@ -155,10 +160,9 @@ class LobbyCommands(commands.Cog):
         channel_id = self.lobby_service.get_lobby_channel_id()
         if message_id and channel_id:
             try:
-                channel = self.bot.get_channel(channel_id)
-                if not channel:
-                    channel = await self.bot.fetch_channel(channel_id)
-                message = await channel.fetch_message(message_id)
+                message = await fetch_message(self.bot, channel_id, message_id)
+                if not message:
+                    return
                 await message.edit(content=None, embed=embed)
                 logger.info(f"Updated lobby embed: {lobby.get_player_count()} players")
             except Exception as exc:
@@ -173,11 +177,9 @@ class LobbyCommands(commands.Cog):
             return
 
         try:
-            thread = self.bot.get_channel(thread_id)
-            if not thread:
-                thread = await self.bot.fetch_channel(thread_id)
-
-            message = await thread.fetch_message(embed_message_id)
+            message = await fetch_message(self.bot, thread_id, embed_message_id)
+            if not message:
+                return
             if not embed:
                 embed = await asyncio.to_thread(self.lobby_service.build_lobby_embed, lobby, guild_id)
             if embed:
@@ -254,7 +256,7 @@ class LobbyCommands(commands.Cog):
             - message: Warning message if roles not set, None otherwise
         """
         user_id = interaction.user.id
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         # Already in lobby (regular or conditional)
         if user_id in lobby.players or user_id in lobby.conditional_players:
@@ -313,7 +315,7 @@ class LobbyCommands(commands.Cog):
         if not await safe_defer(interaction, ephemeral=False):
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         player = await asyncio.to_thread(self.player_service.get_player, interaction.user.id, guild_id)
         if not player:
             await safe_followup(
@@ -337,10 +339,9 @@ class LobbyCommands(commands.Cog):
                     # Fetch message from the dedicated/lobby channel (not necessarily interaction channel)
                     lobby_channel_id = self.lobby_service.get_lobby_channel_id()
                     if lobby_channel_id:
-                        channel = self.bot.get_channel(lobby_channel_id)
-                        if not channel:
-                            channel = await self.bot.fetch_channel(lobby_channel_id)
-                        message = await channel.fetch_message(message_id)
+                        message = await fetch_message(self.bot, lobby_channel_id, message_id)
+                        if not message:
+                            raise LookupError("Lobby message not found")
                     else:
                         message = await interaction.channel.fetch_message(message_id)
 
@@ -454,7 +455,7 @@ class LobbyCommands(commands.Cog):
         if not await safe_defer(interaction, ephemeral=True):
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         lobby = self.lobby_service.get_lobby()
         if not lobby:
             await safe_followup(interaction, content="⚠️ No active lobby.", ephemeral=True)
@@ -532,7 +533,7 @@ class LobbyCommands(commands.Cog):
         if not await safe_defer(interaction, ephemeral=True):
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         # Check registration
         player = await asyncio.to_thread(self.player_service.get_player, interaction.user.id, guild_id)
@@ -633,7 +634,7 @@ class LobbyCommands(commands.Cog):
         if not await safe_defer(interaction, ephemeral=True):
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         lobby = self.lobby_service.get_lobby()
         if not lobby:
             await safe_followup(interaction, content="⚠️ No active lobby.", ephemeral=True)
@@ -674,7 +675,7 @@ class LobbyCommands(commands.Cog):
         logger.info(f"Reset lobby command: User {interaction.user.id} ({interaction.user})")
         can_respond = await safe_defer(interaction, ephemeral=True)
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         match_service = getattr(self.bot, "match_service", None)
         if match_service:
             pending_match = await asyncio.to_thread(match_service.get_last_shuffle, guild_id)
@@ -759,7 +760,7 @@ class LobbyCommands(commands.Cog):
             return
 
         guild = interaction.guild
-        guild_id = guild.id if guild else None
+        guild_id = get_interaction_guild_id(interaction)
         status, info = await self._execute_readycheck(guild, guild_id)
 
         if status == "no_lobby":
@@ -913,10 +914,7 @@ class LobbyCommands(commands.Cog):
 
         if existing_msg_id and existing_channel_id:
             try:
-                ch = self.bot.get_channel(existing_channel_id)
-                if not ch:
-                    ch = await self.bot.fetch_channel(existing_channel_id)
-                msg = await ch.fetch_message(existing_msg_id)
+                msg = await fetch_message(self.bot, existing_channel_id, existing_msg_id)
                 is_refresh = True
             except (discord.NotFound, discord.HTTPException):
                 msg = None

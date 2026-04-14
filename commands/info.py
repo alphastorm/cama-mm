@@ -22,6 +22,7 @@ from utils.debug_logging import debug_log as _dbg_log
 from utils.drawing import draw_rating_distribution
 from utils.embed_safety import truncate_field
 from utils.formatting import JOPACOIN_EMOTE, TOMBSTONE_EMOJI
+from utils.guild import get_interaction_guild_id
 from utils.hero_lookup import classify_hero_role, get_hero_short_name
 from utils.interaction_safety import safe_defer, safe_followup
 from utils.rate_limiter import GLOBAL_RATE_LIMITER
@@ -1115,8 +1116,8 @@ class InfoCommands(commands.Cog):
         """Show unified leaderboard with tabs for all leaderboard types."""
         leaderboard_type = type.value if type else "balance"
         logger.info(f"Leaderboard command: User {interaction.user.id} ({interaction.user}), type={leaderboard_type}")
-        guild = interaction.guild if hasattr(interaction, "guild") else None
-        rl_gid = guild.id if guild else 0
+        guild_id = get_interaction_guild_id(interaction)
+        rl_gid = guild_id or 0
         rl = GLOBAL_RATE_LIMITER.check(
             scope="leaderboard",
             guild_id=rl_gid,
@@ -1160,7 +1161,7 @@ class InfoCommands(commands.Cog):
             # Create unified view
             view = UnifiedLeaderboardView(
                 cog=self,
-                guild_id=guild.id if guild else None,
+                guild_id=guild_id,
                 interaction=interaction,
                 initial_tab=initial_tab,
                 limit=limit,
@@ -1206,8 +1207,8 @@ class InfoCommands(commands.Cog):
         """Show rating system health and calibration stats."""
         target_user = user or interaction.user
         logger.info(f"Calibration command: User {interaction.user.id}, target={target_user.id}")
-        guild = interaction.guild if hasattr(interaction, "guild") else None
-        rl_gid = guild.id if guild else 0
+        guild_id = get_interaction_guild_id(interaction)
+        rl_gid = guild_id or 0
         rl = GLOBAL_RATE_LIMITER.check(
             scope="calibration",
             guild_id=rl_gid,
@@ -1234,7 +1235,6 @@ class InfoCommands(commands.Cog):
                 return
 
             # Otherwise show server-wide stats
-            guild_id = rl_gid
             players = await asyncio.to_thread(self.player_service.get_all, guild_id) if self.player_service else []
             match_count = await asyncio.to_thread(self.match_service.get_match_count, guild_id) if self.match_service else 0
             match_predictions = (
@@ -1654,7 +1654,7 @@ class InfoCommands(commands.Cog):
         rating_system: CamaRatingSystem,
     ):
         """Show detailed calibration stats for an individual player."""
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         # Get player data
         player = await asyncio.to_thread(self.player_service.get_player, user.id, guild_id) if self.player_service else None
         if not player:

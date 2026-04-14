@@ -4,7 +4,22 @@ Tests for permission helpers.
 
 from types import SimpleNamespace
 
-from services.permissions import has_admin_permission, has_allowlisted_admin
+import pytest
+
+from services.permissions import (
+    AdminOnlyError,
+    admin_only,
+    has_admin_permission,
+    has_allowlisted_admin,
+)
+
+
+def _extract_check(check_decorator):
+    async def dummy(interaction):
+        return interaction
+
+    decorated = check_decorator(dummy)
+    return decorated.__discord_app_commands_checks__[0]
 
 
 def test_has_allowlisted_admin(monkeypatch):
@@ -46,3 +61,22 @@ def test_has_admin_permission_false(monkeypatch):
     interaction = SimpleNamespace(user=SimpleNamespace(id=505), guild=None)
 
     assert has_admin_permission(interaction) is False
+
+
+@pytest.mark.asyncio
+async def test_admin_only_allows_admin(monkeypatch):
+    monkeypatch.setattr("services.permissions.ADMIN_USER_IDS", [606])
+    interaction = SimpleNamespace(user=SimpleNamespace(id=606), guild=None)
+    check = _extract_check(admin_only())
+
+    assert await check(interaction) is True
+
+
+@pytest.mark.asyncio
+async def test_admin_only_raises_for_non_admin(monkeypatch):
+    monkeypatch.setattr("services.permissions.ADMIN_USER_IDS", [])
+    interaction = SimpleNamespace(user=SimpleNamespace(id=707), guild=None)
+    check = _extract_check(admin_only("Nope"))
+
+    with pytest.raises(AdminOnlyError, match="Nope"):
+        await check(interaction)

@@ -24,8 +24,9 @@ from services.dig_constants import (
     pick_description,
 )
 from services.dig_constants import get_layer as get_layer_def
-from services.permissions import has_admin_permission
+from services.permissions import admin_only
 from utils.formatting import JOPACOIN_EMOTE
+from utils.guild import get_interaction_guild_id
 from utils.interaction_safety import safe_defer, safe_followup
 from utils.rate_limiter import GLOBAL_RATE_LIMITER
 
@@ -240,7 +241,7 @@ def _backstory_text(result: dict) -> str:
 
 async def _check_registered(interaction: discord.Interaction, bot: commands.Bot):
     """Return the Player if registered, else send an ephemeral error and return None."""
-    guild_id = interaction.guild.id if interaction.guild else None
+    guild_id = get_interaction_guild_id(interaction)
     player = await asyncio.to_thread(bot.player_service.get_player, interaction.user.id, guild_id)
     if not player:
         await interaction.response.send_message(
@@ -1224,7 +1225,7 @@ class DigCommands(commands.Cog):
         self, interaction: discord.Interaction, current: str
     ) -> list[app_commands.Choice[str]]:
         """Autocomplete for owned consumable items."""
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         try:
             items = await asyncio.to_thread(
                 self.dig_service.get_inventory, interaction.user.id, guild_id
@@ -1242,7 +1243,7 @@ class DigCommands(commands.Cog):
         self, interaction: discord.Interaction, current: str
     ) -> list[app_commands.Choice[str]]:
         """Autocomplete for owned relics."""
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         try:
             relics = await asyncio.to_thread(
                 self.dig_service.get_owned_relics, interaction.user.id, guild_id
@@ -1265,7 +1266,7 @@ class DigCommands(commands.Cog):
         if not await require_gamba_channel(interaction):
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         rl_gid = guild_id if guild_id else 0
         rl = GLOBAL_RATE_LIMITER.check(
             scope="dig", guild_id=rl_gid, user_id=interaction.user.id, limit=2, per_seconds=30
@@ -1598,7 +1599,7 @@ class DigCommands(commands.Cog):
 
         await safe_defer(interaction)
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         if user.id == interaction.user.id:
             self_help_lines = [
                 "You tried to help yourself. The pickaxe is confused.",
@@ -1663,7 +1664,7 @@ class DigCommands(commands.Cog):
         if not player:
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         # Get sabotage preview info
         try:
@@ -1751,7 +1752,7 @@ class DigCommands(commands.Cog):
 
         await safe_defer(interaction)
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         target_id = user.id if user else interaction.user.id
         is_own = target_id == interaction.user.id
 
@@ -1934,7 +1935,7 @@ class DigCommands(commands.Cog):
 
         await safe_defer(interaction)
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         try:
             lb = _wrap(await asyncio.to_thread(
                 self.dig_service.get_leaderboard, guild_id
@@ -1992,7 +1993,7 @@ class DigCommands(commands.Cog):
 
         await safe_defer(interaction)
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         try:
             result = _wrap(await asyncio.to_thread(
                 self.dig_service.get_hall_of_fame, guild_id
@@ -2048,7 +2049,7 @@ class DigCommands(commands.Cog):
 
         await safe_defer(interaction)
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         try:
             result = _wrap(await asyncio.to_thread(
                 self.dig_service.use_item, interaction.user.id, guild_id, item
@@ -2098,7 +2099,7 @@ class DigCommands(commands.Cog):
 
         await safe_defer(interaction)
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         try:
             result = _wrap(await asyncio.to_thread(
                 self.dig_service.gift_relic,
@@ -2135,7 +2136,7 @@ class DigCommands(commands.Cog):
 
         await safe_defer(interaction)
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         try:
             shop = _wrap(await asyncio.to_thread(
                 self.dig_service.get_shop, interaction.user.id, guild_id
@@ -2207,7 +2208,7 @@ class DigCommands(commands.Cog):
 
         await safe_defer(interaction)
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         try:
             result = _wrap(await asyncio.to_thread(
                 self.dig_service.buy_item, interaction.user.id, guild_id, item
@@ -2262,7 +2263,7 @@ class DigCommands(commands.Cog):
 
         await safe_defer(interaction)
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         try:
             museum = await asyncio.to_thread(
                 self.dig_service.get_museum, guild_id
@@ -2322,7 +2323,7 @@ class DigCommands(commands.Cog):
 
         await safe_defer(interaction)
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         try:
             flex = _wrap(await asyncio.to_thread(
                 self.dig_service.get_flex_data, interaction.user.id, guild_id
@@ -2411,7 +2412,7 @@ class DigCommands(commands.Cog):
 
         await safe_defer(interaction)
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         try:
             check = _wrap(await asyncio.to_thread(
                 self.dig_service.can_prestige, interaction.user.id, guild_id
@@ -2546,7 +2547,7 @@ class DigCommands(commands.Cog):
         if not player:
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         try:
             preview = _wrap(await asyncio.to_thread(
@@ -2610,7 +2611,7 @@ class DigCommands(commands.Cog):
 
         await safe_defer(interaction)
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         try:
             info = _wrap(await asyncio.to_thread(
                 self.dig_service.get_upgrade_info, interaction.user.id, guild_id
@@ -2681,7 +2682,7 @@ class DigCommands(commands.Cog):
 
         await safe_defer(interaction)
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         try:
             result = _wrap(await asyncio.to_thread(
                 self.dig_service.set_trap, interaction.user.id, guild_id
@@ -2712,7 +2713,7 @@ class DigCommands(commands.Cog):
 
         await safe_defer(interaction)
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         try:
             result = _wrap(await asyncio.to_thread(
                 self.dig_service.buy_insurance, interaction.user.id, guild_id
@@ -2757,7 +2758,7 @@ class DigCommands(commands.Cog):
 
         await safe_defer(interaction)
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         try:
             items = await asyncio.to_thread(
                 self.dig_service.get_inventory, interaction.user.id, guild_id
@@ -2808,7 +2809,7 @@ class DigCommands(commands.Cog):
         if not await require_gamba_channel(interaction):
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         weather = await asyncio.to_thread(self.dig_service.get_weather, guild_id)
 
         if not weather:
@@ -2866,12 +2867,9 @@ class DigCommands(commands.Cog):
 
     @dig.command(name="resetcooldown", description="Reset a player's free dig cooldown (Admin only)")
     @app_commands.describe(user="The player whose cooldown to reset")
+    @admin_only("Admin only.")
     async def dig_resetcooldown(self, interaction: discord.Interaction, user: discord.User):
-        if not has_admin_permission(interaction):
-            await interaction.response.send_message("Admin only.", ephemeral=True)
-            return
-
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         result = await asyncio.to_thread(self.dig_service.reset_dig_cooldown, user.id, guild_id)
 
         if not result.get("success"):
@@ -2882,25 +2880,20 @@ class DigCommands(commands.Cog):
 
     @dig.command(name="forceevent", description="Force next dig to trigger an event (Admin only)")
     @app_commands.describe(user="The player whose next dig gets an event")
+    @admin_only("Admin only.")
     async def dig_forceevent(self, interaction: discord.Interaction, user: discord.User):
-        if not has_admin_permission(interaction):
-            await interaction.response.send_message("Admin only.", ephemeral=True)
-            return
         # Store on the service so the next dig() for this user forces an event
         if not hasattr(self.dig_service, "_force_event_for"):
             self.dig_service._force_event_for = set()
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         self.dig_service._force_event_for.add((user.id, guild_id))
         await interaction.response.send_message(f"Next dig for {user.mention} will force an event.", ephemeral=True)
 
     @dig.command(name="setdepth", description="Set a player's tunnel depth (Admin only)")
     @app_commands.describe(user="The player", depth="New depth value")
+    @admin_only("Admin only.")
     async def dig_setdepth(self, interaction: discord.Interaction, user: discord.User, depth: int):
-        if not has_admin_permission(interaction):
-            await interaction.response.send_message("Admin only.", ephemeral=True)
-            return
-
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         tunnel = await asyncio.to_thread(self.dig_service.dig_repo.get_tunnel, user.id, guild_id)
         if not tunnel:
             await interaction.response.send_message("That player doesn't have a tunnel.", ephemeral=True)
@@ -2931,7 +2924,7 @@ class DigCommands(commands.Cog):
         if not player:
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         result = await asyncio.to_thread(
             self.dig_service.get_miner_profile,
             interaction.user.id,
@@ -2970,7 +2963,7 @@ class DigCommands(commands.Cog):
         if not player:
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         result = await asyncio.to_thread(
             self.dig_service.set_miner_profile,
             interaction.user.id,
@@ -3009,7 +3002,7 @@ class DigCommands(commands.Cog):
         if not player:
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         result = await asyncio.to_thread(
             self.dig_service.set_miner_stats,
             interaction.user.id,
@@ -3047,7 +3040,7 @@ class DigCommands(commands.Cog):
         if not player:
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         if mode.value == "llm" and not self.dig_llm_service:
             await interaction.response.send_message(

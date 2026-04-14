@@ -15,10 +15,11 @@ from discord.ext import commands
 
 from commands.checks import require_gamba_channel
 from config import TRIVIA_ANSWER_TIMEOUT_SECONDS, TRIVIA_COOLDOWN_SECONDS
-from services.permissions import has_admin_permission
+from services.permissions import admin_only, has_admin_permission
 from services.trivia_image_cache import get_trivia_image
 from services.trivia_questions import TriviaQuestion, generate_question
 from utils.formatting import JOPACOIN_EMOTE
+from utils.guild import get_interaction_guild_id
 from utils.interaction_safety import safe_defer, safe_followup
 
 logger = logging.getLogger("cama_bot.commands.trivia")
@@ -341,7 +342,7 @@ class TriviaCog(commands.Cog):
         if not await require_gamba_channel(interaction):
             return
 
-        guild_id = interaction.guild.id if interaction.guild else 0
+        guild_id = get_interaction_guild_id(interaction) or 0
         user_id = interaction.user.id
         key = (user_id, guild_id)
 
@@ -429,16 +430,11 @@ class TriviaCog(commands.Cog):
         description="(Admin) Reset a user's trivia cooldown.",
     )
     @app_commands.describe(user="The user whose trivia cooldown to reset")
+    @admin_only("You need admin permissions to use this command.")
     async def trivia_reset_cooldown(
         self, interaction: discord.Interaction, user: discord.User
     ):
-        if not has_admin_permission(interaction):
-            await interaction.response.send_message(
-                "You need admin permissions to use this command.", ephemeral=True
-            )
-            return
-
-        guild_id = interaction.guild.id if interaction.guild else 0
+        guild_id = get_interaction_guild_id(interaction) or 0
         player_service = self.bot.player_service
         reset = await asyncio.to_thread(
             player_service.reset_trivia_cooldown, user.id, guild_id

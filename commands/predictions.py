@@ -15,6 +15,7 @@ from discord.ext import commands
 from services.permissions import has_admin_permission
 from services.prediction_service import PredictionService
 from utils.formatting import JOPACOIN_EMOTE
+from utils.guild import get_interaction_guild_id
 from utils.interaction_safety import safe_defer, safe_followup
 from utils.neon_helpers import get_neon_service
 
@@ -231,7 +232,7 @@ class PersistentPredictionView(discord.ui.View):
             )
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         player = await asyncio.to_thread(
             self.cog.player_service.get_player, interaction.user.id, guild_id
         )
@@ -484,7 +485,7 @@ class PredictionCommands(commands.Cog):
         if not await safe_defer(interaction):
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         # Check if user is registered
         player = await asyncio.to_thread(
@@ -665,7 +666,7 @@ class PredictionCommands(commands.Cog):
                     neon = get_neon_service(self.bot)
                     if neon:
                         neon_result = await neon.on_prediction_resolved(
-                            guild_id=interaction.guild.id if interaction.guild else None,
+                            guild_id=get_interaction_guild_id(interaction),
                             question=pred.get("question", "") if pred else "",
                             outcome=outcome.value,
                             total_pool=settlement.get("total_pool", 0),
@@ -698,7 +699,7 @@ class PredictionCommands(commands.Cog):
                         unanimous_data = settlement.get("unanimous_wrong")
                         if unanimous_data:
                             uw_result = await neon.on_unanimous_wrong(
-                                guild_id=interaction.guild.id if interaction.guild else None,
+                                guild_id=get_interaction_guild_id(interaction),
                                 consensus_percentage=unanimous_data["consensus_percentage"],
                                 winning_side=unanimous_data["winning_side"],
                                 loser_count=unanimous_data["loser_count"],
@@ -949,7 +950,7 @@ class PredictionCommands(commands.Cog):
         if not await safe_defer(interaction):
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         limit = max(1, min(limit, 25))  # Cap between 1 and 25
 
         # Always auto-lock expired predictions first
@@ -1102,7 +1103,7 @@ class PredictionCommands(commands.Cog):
             return
 
         if history:
-            guild_id = interaction.guild.id if interaction.guild else None
+            guild_id = get_interaction_guild_id(interaction)
             positions = await asyncio.to_thread(
                 self.prediction_service.get_user_resolved_positions,
                 interaction.user.id, guild_id,
@@ -1153,7 +1154,7 @@ class PredictionCommands(commands.Cog):
 
             await safe_followup(interaction, embed=embed)
         else:
-            guild_id = interaction.guild.id if interaction.guild else None
+            guild_id = get_interaction_guild_id(interaction)
             positions = await asyncio.to_thread(
                 self.prediction_service.get_user_active_positions,
                 interaction.user.id, guild_id,

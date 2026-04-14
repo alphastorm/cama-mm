@@ -14,9 +14,10 @@ from discord.ext import commands
 
 from services.match_enrichment_service import MatchEnrichmentService
 from services.opendota_player_service import OpenDotaPlayerService
-from services.permissions import has_admin_permission
+from services.permissions import admin_only
 from utils.drawing import draw_matches_table
 from utils.embeds import _determine_lane_outcomes, create_enriched_match_embed
+from utils.guild import get_interaction_guild_id
 from utils.interaction_safety import safe_defer, safe_followup
 from utils.match_views import EnrichedMatchView
 
@@ -54,18 +55,15 @@ class EnrichmentCommands(commands.Cog):
         name="setleague", description="Set the Valve league ID for this server (Admin)"
     )
     @app_commands.describe(league_id="The Valve/Dota 2 league ID")
+    @admin_only()
     async def setleague(self, interaction: discord.Interaction, league_id: int):
         """Set the league ID for match discovery."""
         logger.info(f"Setleague command: User {interaction.user.id} setting league to {league_id}")
 
-        if not has_admin_permission(interaction):
-            await interaction.response.send_message("This command is admin-only.", ephemeral=True)
-            return
-
         if not await safe_defer(interaction, ephemeral=True):
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         if not guild_id:
             await safe_followup(
                 interaction,
@@ -90,6 +88,7 @@ class EnrichmentCommands(commands.Cog):
         valve_match_id="The Dota 2 match ID (optional - defaults to enriching most recent match)",
         internal_match_id="Our internal match ID (optional - defaults to most recent)",
     )
+    @admin_only()
     async def enrichmatch(
         self,
         interaction: discord.Interaction,
@@ -107,14 +106,10 @@ class EnrichmentCommands(commands.Cog):
             f"valve_match_id={valve_match_id}, internal_match_id={internal_match_id}"
         )
 
-        if not has_admin_permission(interaction):
-            await interaction.response.send_message("This command is admin-only.", ephemeral=True)
-            return
-
         if not await safe_defer(interaction, ephemeral=True):
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         # Determine which internal match to enrich
         if internal_match_id:
@@ -222,13 +217,10 @@ class EnrichmentCommands(commands.Cog):
         name="backfill",
         description="Backfill steam_id from dotabuff URLs for all players (Admin)",
     )
+    @admin_only()
     async def backfillsteamid(self, interaction: discord.Interaction):
         """Backfill steam_id for all players who have dotabuff_url but no steam_id."""
         logger.info(f"Backfillsteamid command: User {interaction.user.id}")
-
-        if not has_admin_permission(interaction):
-            await interaction.response.send_message("This command is admin-only.", ephemeral=True)
-            return
 
         if not await safe_defer(interaction, ephemeral=True):
             return
@@ -258,7 +250,7 @@ class EnrichmentCommands(commands.Cog):
         if not await safe_defer(interaction, ephemeral=True):
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         if not guild_id:
             await safe_followup(
                 interaction,
@@ -313,7 +305,7 @@ class EnrichmentCommands(commands.Cog):
 
         target_id = user.id if user else interaction.user.id
         target_name = user.display_name if user else interaction.user.display_name
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         # Validate player exists
         player = self.player_service.get_player(target_id, guild_id)
@@ -486,7 +478,7 @@ class EnrichmentCommands(commands.Cog):
         """View detailed stats for a specific match with the enriched embed."""
         target_id = user.id if user else interaction.user.id
         target_name = user.display_name if user else interaction.user.display_name
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         logger.info(
             f"Viewmatch command: User {interaction.user.id}, match_id={match_id}, target={target_id}"
@@ -609,6 +601,7 @@ class EnrichmentCommands(commands.Cog):
         dry_run="Preview only, don't apply enrichments (default: False)",
         refill_fantasy="Re-enrich matches that have enrichment but no fantasy data",
     )
+    @admin_only()
     async def autodiscover(
         self,
         interaction: discord.Interaction,
@@ -616,14 +609,6 @@ class EnrichmentCommands(commands.Cog):
         refill_fantasy: bool = False,
     ):
         """Auto-discover Dota 2 match IDs by correlating player match histories."""
-        if not has_admin_permission(interaction):
-            await safe_followup(
-                interaction,
-                content="This command is admin-only.",
-                ephemeral=True,
-            )
-            return
-
         logger.info(
             f"Autodiscover command: User {interaction.user.id}, "
             f"dry_run={dry_run}, refill_fantasy={refill_fantasy}"
@@ -634,7 +619,7 @@ class EnrichmentCommands(commands.Cog):
 
         # Handle refill_fantasy mode - re-enrich matches that have valve_match_id but no fantasy data
         if refill_fantasy:
-            guild_id = interaction.guild.id if interaction.guild else None
+            guild_id = get_interaction_guild_id(interaction)
             await self._refill_fantasy_data(interaction, dry_run, guild_id)
             return
 
@@ -654,7 +639,7 @@ class EnrichmentCommands(commands.Cog):
             ephemeral=True,
         )
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         results = await asyncio.to_thread(
             functools.partial(
                 discovery_service.discover_all_matches,
@@ -799,22 +784,15 @@ class EnrichmentCommands(commands.Cog):
         name="wipeall",
         description="[Admin] Wipe all match enrichments",
     )
+    @admin_only()
     async def wipediscovered(self, interaction: discord.Interaction):
         """Clear all match enrichments so they can be re-discovered."""
-        if not has_admin_permission(interaction):
-            await safe_followup(
-                interaction,
-                content="This command is admin-only.",
-                ephemeral=True,
-            )
-            return
-
         logger.info(f"Wipediscovered command: User {interaction.user.id}")
 
         if not await safe_defer(interaction, ephemeral=True):
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         enriched_count = self.match_service.get_enriched_count(guild_id)
 
         if enriched_count == 0:
@@ -840,16 +818,9 @@ class EnrichmentCommands(commands.Cog):
     @app_commands.describe(
         match_id="Internal match ID to wipe enrichment from",
     )
+    @admin_only()
     async def wipematch(self, interaction: discord.Interaction, match_id: int):
         """Clear enrichment data for a specific match."""
-        if not has_admin_permission(interaction):
-            await safe_followup(
-                interaction,
-                content="This command is admin-only.",
-                ephemeral=True,
-            )
-            return
-
         logger.info(f"Wipematch command: User {interaction.user.id}, match_id={match_id}")
 
         if not await safe_defer(interaction, ephemeral=True):
@@ -932,6 +903,7 @@ class EnrichmentCommands(commands.Cog):
     @enrich.command(
         name="rebuildpairings", description="Rebuild pairwise stats from match history (Admin only)"
     )
+    @admin_only()
     async def rebuildpairings(self, interaction: discord.Interaction):
         """Admin command to rebuild all pairwise statistics from match history."""
         logger.info(
@@ -939,10 +911,6 @@ class EnrichmentCommands(commands.Cog):
             interaction.user.id,
             interaction.user,
         )
-
-        if not has_admin_permission(interaction):
-            await interaction.response.send_message("This command is admin-only.", ephemeral=True)
-            return
 
         if not self.pairings_service:
             await interaction.response.send_message("Pairings service not available.", ephemeral=True)

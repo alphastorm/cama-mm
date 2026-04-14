@@ -9,12 +9,13 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from services.permissions import has_admin_permission
+from services.permissions import admin_only
 from utils.drawing import (
     draw_calibration_curve,
     draw_prediction_over_time,
     draw_rating_comparison_chart,
 )
+from utils.guild import get_interaction_guild_id
 from utils.interaction_safety import safe_defer, safe_followup
 
 logger = logging.getLogger("cama_bot.commands.rating_analysis")
@@ -52,6 +53,7 @@ class RatingAnalysisCommands(commands.Cog):
             app_commands.Choice(name="player - Show player's OpenSkill rating details", value="player"),
         ]
     )
+    @admin_only()
     async def ratinganalysis(
         self,
         interaction: discord.Interaction,
@@ -59,13 +61,6 @@ class RatingAnalysisCommands(commands.Cog):
         user: discord.Member | None = None,
     ):
         """Analyze and compare Glicko-2 and OpenSkill rating systems."""
-        if not has_admin_permission(interaction):
-            await interaction.response.send_message(
-                "This command is admin-only.",
-                ephemeral=True,
-            )
-            return
-
         if action == "backfill":
             await self._handle_backfill(interaction)
         elif action == "compare":
@@ -96,7 +91,7 @@ class RatingAnalysisCommands(commands.Cog):
         # Run in thread to avoid blocking
         try:
             result = await asyncio.to_thread(
-                lambda: self.match_service.backfill_openskill_ratings(guild_id=interaction.guild.id if interaction.guild else None, reset_first=True),
+                lambda: self.match_service.backfill_openskill_ratings(guild_id=get_interaction_guild_id(interaction), reset_first=True),
             )
         except Exception as e:
             logger.error(f"Backfill error: {e}")
@@ -143,7 +138,7 @@ class RatingAnalysisCommands(commands.Cog):
         comparison_service = self.rating_comparison_service
 
         try:
-            guild_id = interaction.guild.id if interaction.guild else None
+            guild_id = get_interaction_guild_id(interaction)
             comparison_data = await asyncio.to_thread(
                 comparison_service.get_comparison_summary, guild_id
             )
@@ -250,7 +245,7 @@ class RatingAnalysisCommands(commands.Cog):
         comparison_service = self.rating_comparison_service
 
         try:
-            guild_id = interaction.guild.id if interaction.guild else None
+            guild_id = get_interaction_guild_id(interaction)
             curve_data = await asyncio.to_thread(
                 comparison_service.get_calibration_curve_data, guild_id
             )
@@ -306,7 +301,7 @@ class RatingAnalysisCommands(commands.Cog):
 
         comparison_service = self.rating_comparison_service
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         try:
             comparison_data = await asyncio.to_thread(
                 comparison_service.get_comparison_summary, guild_id
@@ -366,7 +361,7 @@ class RatingAnalysisCommands(commands.Cog):
         # Default to the command invoker if no user specified
         target = user or interaction.user
         discord_id = target.id
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         # Fetch player data
         player = self.player_service.get_player(discord_id, guild_id)

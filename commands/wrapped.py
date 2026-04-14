@@ -16,6 +16,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from services.wrapped_service import get_random_flavor
+from utils.guild import get_interaction_guild_id
 from utils.hero_lookup import get_hero_name
 from utils.interaction_safety import safe_defer, safe_followup
 from utils.wrapped_drawing import (
@@ -464,7 +465,7 @@ class WrappedCog(commands.Cog):
             return
 
         year = datetime.now(UTC).year
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         target_user = user or interaction.user
 
         try:

@@ -33,6 +33,7 @@ from services.flavor_text_service import EVENT_EXAMPLES, FlavorEvent
 from services.permissions import has_admin_permission
 from services.player_service import PlayerService
 from utils.formatting import JOPACOIN_EMOTE
+from utils.guild import get_interaction_guild_id
 from utils.hero_lookup import get_all_heroes, get_hero_color, get_hero_image_url, get_hero_name
 from utils.interaction_safety import safe_defer, safe_followup
 from utils.neon_helpers import get_neon_service
@@ -155,7 +156,7 @@ class ShopCommands(commands.Cog):
         )
         if self.recalibration_service:
             try:
-                guild_id = interaction.guild.id if interaction.guild else None
+                guild_id = get_interaction_guild_id(interaction)
                 check = await asyncio.to_thread(
                     self.recalibration_service.can_recalibrate,
                     interaction.user.id,
@@ -201,8 +202,7 @@ class ShopCommands(commands.Cog):
         hero: str | None = None,
     ):
         """Buy items from the shop with jopacoin."""
-        guild = interaction.guild if interaction.guild else None
-        rl_gid = guild.id if guild else 0
+        rl_gid = get_interaction_guild_id(interaction) or 0
         rl = GLOBAL_RATE_LIMITER.check(
             scope="shop",
             guild_id=rl_gid,
@@ -268,7 +268,7 @@ class ShopCommands(commands.Cog):
             await self._handle_dig_item(interaction, item)
         elif item == "recalibrate_cooldown":
             # User selected the ON COOLDOWN item — block with cooldown info
-            guild_id = interaction.guild.id if interaction.guild else None
+            guild_id = get_interaction_guild_id(interaction)
             if self.recalibration_service:
                 check = await asyncio.to_thread(
                     self.recalibration_service.can_recalibrate,
@@ -289,7 +289,7 @@ class ShopCommands(commands.Cog):
     async def _handle_recalibrate(self, interaction: discord.Interaction):
         """Handle the recalibration purchase."""
         user_id = interaction.user.id
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         if not self.recalibration_service:
             await interaction.response.send_message(
@@ -392,7 +392,7 @@ class ShopCommands(commands.Cog):
     ):
         """Handle the balance announcement purchase."""
         user_id = interaction.user.id
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         # Determine cost
         cost = SHOP_ANNOUNCE_TARGET_COST if target else SHOP_ANNOUNCE_COST
@@ -659,7 +659,7 @@ class ShopCommands(commands.Cog):
     ):
         """Handle the protect hero purchase."""
         user_id = interaction.user.id
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         cost = SHOP_PROTECT_HERO_COST
 
         # Check if registered
@@ -781,7 +781,7 @@ class ShopCommands(commands.Cog):
     ):
         """Handle the mystery gift purchase."""
         user_id = interaction.user.id
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         cost = SHOP_MYSTERY_GIFT_COST
 
         # Check if registered
@@ -822,7 +822,7 @@ class ShopCommands(commands.Cog):
     ):
         """Handle the Double or Nothing gamble."""
         user_id = interaction.user.id
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         cost = SHOP_DOUBLE_OR_NOTHING_COST
 
         # Check if registered
@@ -1055,7 +1055,7 @@ class ShopCommands(commands.Cog):
     ):
         """Handle the soft avoid purchase."""
         user_id = interaction.user.id
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         cost = SHOP_SOFT_AVOID_COST
 
         # Can't avoid yourself
@@ -1166,7 +1166,7 @@ class ShopCommands(commands.Cog):
     ):
         """Handle the package deal purchase."""
         user_id = interaction.user.id
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         # Can't package deal with yourself
         if target.id == user_id:
@@ -1270,7 +1270,7 @@ class ShopCommands(commands.Cog):
     async def myavoids(self, interaction: discord.Interaction):
         """View your active soft avoids."""
         user_id = interaction.user.id
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         # Check if soft_avoid_service is available
         soft_avoid_service = getattr(self.bot, "soft_avoid_service", None)
@@ -1309,7 +1309,7 @@ class ShopCommands(commands.Cog):
     async def mydeals(self, interaction: discord.Interaction):
         """View your active package deals."""
         user_id = interaction.user.id
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         # Check if package_deal_service is available
         package_deal_service = getattr(self.bot, "package_deal_service", None)
@@ -1366,7 +1366,7 @@ class ShopCommands(commands.Cog):
         if not await safe_defer(interaction, ephemeral=False):
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
         user_id = interaction.user.id
 
         # Check registration
@@ -1459,7 +1459,7 @@ class ShopCommands(commands.Cog):
                 await asyncio.to_thread(
                     lambda: db.execute_write(
                         "INSERT INTO mana_shop_items (discord_id, guild_id, item_type, purchased_at, data) VALUES (?, ?, ?, ?, ?)",
-                        (user_id, interaction.guild.id if interaction.guild else 0, "mana_shield", now_ts, get_today_pst()),
+                        (user_id, guild_id or 0, "mana_shield", now_ts, get_today_pst()),
                     )
                 )
             new_balance = balance - cost
@@ -1478,7 +1478,7 @@ class ShopCommands(commands.Cog):
                 row = await asyncio.to_thread(
                     lambda: db.execute_read(
                         "SELECT total_lost FROM mana_daily_losses WHERE discord_id=? AND guild_id=? AND loss_date=?",
-                        (user_id, interaction.guild.id if interaction.guild else 0, today),
+                        (user_id, guild_id or 0, today),
                     )
                 )
                 total_lost = row[0]["total_lost"] if row else 0
@@ -1508,7 +1508,7 @@ class ShopCommands(commands.Cog):
                 await asyncio.to_thread(
                     lambda: db.execute_write(
                         "INSERT INTO mana_shop_items (discord_id, guild_id, item_type, target_id, purchased_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)",
-                        (user_id, interaction.guild.id if interaction.guild else 0, "guardian_angel", target.id, now_ts, expires),
+                        (user_id, guild_id or 0, "guardian_angel", target.id, now_ts, expires),
                     )
                 )
             new_balance = balance - cost
@@ -1548,7 +1548,7 @@ class ShopCommands(commands.Cog):
             return
 
         user_id = interaction.user.id
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         # Check registration
         player = await asyncio.to_thread(self.player_service.get_player, user_id, guild_id)

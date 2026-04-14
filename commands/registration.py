@@ -15,6 +15,7 @@ from config import (
     MMR_MODAL_TIMEOUT_MINUTES,
 )
 from utils.formatting import format_role_display
+from utils.guild import get_interaction_guild_id
 from utils.interaction_safety import safe_defer, safe_followup
 from utils.neon_helpers import get_neon_service
 
@@ -52,7 +53,7 @@ class RegistrationCommands(commands.Cog):
         if not await safe_defer(interaction, ephemeral=True):
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         async def _finalize_register(mmr_override: int | None = None):
             result = await asyncio.to_thread(
@@ -215,7 +216,7 @@ class RegistrationCommands(commands.Cog):
             await interaction.followup.send("❌ Player service not available.", ephemeral=True)
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         # Check if player is registered
         player = await asyncio.to_thread(self.player_service.get_player, interaction.user.id, guild_id)
@@ -304,7 +305,7 @@ class RegistrationCommands(commands.Cog):
             await interaction.followup.send("❌ Player service not available.", ephemeral=True)
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         # Check if player is registered
         player = await asyncio.to_thread(self.player_service.get_player, interaction.user.id, guild_id)
@@ -372,7 +373,7 @@ class RegistrationCommands(commands.Cog):
             await interaction.followup.send("❌ Player service not available.", ephemeral=True)
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         # Check if player is registered
         player = await asyncio.to_thread(self.player_service.get_player, interaction.user.id, guild_id)
@@ -445,7 +446,7 @@ class RegistrationCommands(commands.Cog):
             # Deduplicate roles while preserving order
             role_list = list(dict.fromkeys(role_list))
 
-            guild_id = interaction.guild.id if interaction.guild else None
+            guild_id = get_interaction_guild_id(interaction)
             await asyncio.to_thread(self.player_service.set_roles, interaction.user.id, guild_id, role_list)
 
             role_display = ", ".join([format_role_display(r) for r in role_list])
@@ -466,7 +467,7 @@ class RegistrationCommands(commands.Cog):
         if not await safe_defer(interaction, ephemeral=True):
             return
 
-        guild_id = interaction.guild.id if interaction.guild else None
+        guild_id = get_interaction_guild_id(interaction)
 
         player = await asyncio.to_thread(
             self.player_service.get_player, interaction.user.id, guild_id

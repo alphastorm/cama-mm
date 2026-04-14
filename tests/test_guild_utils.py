@@ -1,6 +1,8 @@
 """Tests for guild utility functions."""
 
-from utils.guild import is_dm_context, normalize_guild_id
+from types import SimpleNamespace
+
+from utils.guild import get_interaction_guild_id, is_dm_context, normalize_guild_id
 
 
 class TestNormalizeGuildId:
@@ -35,3 +37,22 @@ class TestIsDmContext:
         """Valid guild ID is not a DM."""
         assert is_dm_context(123456789) is False
         assert is_dm_context(1) is False
+
+
+class TestGetInteractionGuildId:
+    """Tests for interaction guild ID extraction."""
+
+    def test_returns_guild_id_when_present(self):
+        interaction = SimpleNamespace(guild=SimpleNamespace(id=123456789))
+
+        assert get_interaction_guild_id(interaction) == 123456789
+
+    def test_returns_none_for_dm(self):
+        interaction = SimpleNamespace(guild=None)
+
+        assert get_interaction_guild_id(interaction) is None
+
+    def test_returns_none_when_guild_attr_missing(self):
+        interaction = SimpleNamespace()
+
+        assert get_interaction_guild_id(interaction) is None
